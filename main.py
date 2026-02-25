@@ -1,6 +1,7 @@
 """
-🌾 Dashboard Interactivo: Producción de Cereales en Colombia
-Análisis Exploratorio de Datos - Grupo 2 MAD
+Dashboard Interactivo: Producción de Arroz en Colombia
+Análisis Exploratorio de Datos (EDA) - Enfoque: De Macro a Específico
+Grupo 2 MAD
 Fecha de creación: 24 de febrero de 2026
 """
 
@@ -14,8 +15,8 @@ from datetime import datetime
 
 # ==================== CONFIGURACIÓN DE LA PÁGINA ====================
 st.set_page_config(
-    page_title="Dashboard Cereales Colombia",
-    page_icon="🌾",
+    page_title="Dashboard Arroz Colombia",
+    page_icon="🍚",
     layout="wide",
     initial_sidebar_state="expanded"
 )
@@ -52,7 +53,7 @@ st.markdown("""
 # ==================== CARGA DE DATOS ====================
 @st.cache_data
 def load_data():
-    """Carga y preprocesa los datos de cereales desde Dropbox"""
+    """Carga y preprocesa los datos de arroz desde Dropbox"""
     url = 'https://www.dropbox.com/scl/fi/e3iwe3z3jszouxues5bai/data21022026.csv?rlkey=fb1ex5sbf7yz4p0im8gfiziwm&st=va67mghf&dl=1'
     
     # Cargar dataset completo
@@ -61,8 +62,11 @@ def load_data():
     # Limpiar nombres de columnas
     df_completo.columns = df_completo.columns.str.strip().str.replace('\n', ' ')
     
-    # Filtrar solo CEREALES
-    df = df_completo[df_completo['GRUPO  DE CULTIVO'].str.strip().str.upper() == 'CEREALES'].copy()
+    # Filtrar solo ARROZ
+    df = df_completo[
+        (df_completo['GRUPO  DE CULTIVO'].str.strip().str.upper() == 'CEREALES') &
+        (df_completo['CULTIVO'].str.strip().str.upper() == 'ARROZ')
+    ].copy()
     
     # Renombrar columnas
     column_mapping = {
@@ -96,39 +100,55 @@ def load_data():
     return df
 
 # Cargar datos
-with st.spinner('Cargando datos de cereales...'):
+with st.spinner('Cargando datos de arroz...'):
     df = load_data()
 
-# ==================== SIDEBAR - INFORMACIÓN ====================
-st.sidebar.markdown("## Información del Dashboard")
+# ==================== SIDEBAR - FILTROS INTERACTIVOS ====================
+st.sidebar.markdown("## Filtros Interactivos")
 st.sidebar.markdown("---")
-st.sidebar.info("""
-Este dashboard muestra la totalidad de los datos de producción de cereales en Colombia.
 
-Todos los cereales, departamentos y años disponibles están incluidos en las visualizaciones.
-""")
+# Filtro de Departamentos
+departamentos_disponibles = sorted(df['departamento'].unique())
+departamentos_seleccionados = st.sidebar.multiselect(
+    "Selecciona Departamentos:",
+    options=departamentos_disponibles,
+    default=departamentos_disponibles,  # Todos seleccionados por defecto
+    help="Selecciona departamentos para filtrar"
+)
 
-# ==================== DATOS COMPLETOS (SIN FILTROS) ====================
-# Mostrar todos los datos sin aplicar filtros
+st.sidebar.markdown("---")
+st.sidebar.info("Todos los departamentos están seleccionados por defecto. Modifica los filtros para personalizar tu análisis.")
+
+# ==================== APLICAR FILTROS ====================
 df_filtrado = df.copy()
 
+# Aplicar filtro de departamentos
+if departamentos_seleccionados:
+    df_filtrado = df_filtrado[df_filtrado['departamento'].isin(departamentos_seleccionados)]
+
+# Validar que hay datos después de filtrar
+if df_filtrado.empty:
+    st.error("No hay datos disponibles con los filtros seleccionados. Por favor, ajusta tus selecciones.")
+    st.stop()
+
 # ==================== HEADER ====================
-st.markdown('<div class="main-header">Dashboard: Producción de Cereales en Colombia</div>', unsafe_allow_html=True)
+st.markdown('<div class="main-header">Dashboard: Producción de Arroz en Colombia</div>', unsafe_allow_html=True)
 
 st.markdown("""
 <div class="info-box">
-    <h3>Contexto del Dashboard</h3>
-    <p><strong>Objetivo:</strong> Analizar la producción de cereales en Colombia mediante datos de las 
-    Evaluaciones Agropecuarias Municipales (EVA) del Ministerio de Agricultura.</p>
+    <h3>Contexto del Dashboard - EDA de Macro a Específico</h3>
+    <p><strong>Objetivo:</strong> Analizar la producción de arroz en Colombia mediante un enfoque estructurado 
+    que va de lo general a lo particular, utilizando datos de las Evaluaciones Agropecuarias Municipales (EVA) 
+    del Ministerio de Agricultura.</p>
     <p><strong>Preguntas Analíticas:</strong></p>
     <ul>
-        <li>¿Cuál es la distribución geográfica de la producción de cereales?</li>
-        <li>¿Qué cereales tienen mayor rendimiento y producción?</li>
-        <li>¿Cómo ha evolucionado la producción a lo largo del tiempo?</li>
-        <li>¿Existen diferencias entre sistemas productivos?</li>
+        <li>¿Cómo ha evolucionado la producción de arroz a lo largo del tiempo? (Macro - Temporal)</li>
+        <li>¿Cuál es la distribución geográfica de la producción? (Macro - Espacial)</li>
+        <li>¿Qué sistemas productivos se utilizan y cuál es su eficiencia? (Específico - Sistemas)</li>
+        <li>¿Cómo se comparan los rendimientos entre regiones? (Específico - Rendimientos)</li>
     </ul>
-    <p><strong>Instrucciones:</strong> Utiliza los filtros en la barra lateral izquierda para personalizar 
-    las visualizaciones según tus necesidades de análisis.</p>
+    <p><strong>Instrucciones:</strong> Las visualizaciones están organizadas de lo macro (visión general) a lo específico (detalles). 
+    Utiliza los filtros para personalizar tu análisis.</p>
 </div>
 """, unsafe_allow_html=True)
 
@@ -171,89 +191,37 @@ with col4:
 
 st.markdown("---")
 
-# ==================== VISUALIZACIÓN 1: DISTRIBUCIÓN GEOGRÁFICA ====================
-st.markdown("## Visualización 1: Distribución Geográfica de la Producción")
+# ==================== FILTROS ADICIONALES ====================
+st.markdown("## Filtros de Análisis")
 
-col1, col2 = st.columns([2, 1])
+col_filtro_año = st.columns([1, 2])[0]
 
-with col1:
-    # Producción por departamento - Ranking completo
-    produccion_dep = df_filtrado.groupby('departamento')['produccion'].sum().sort_values(ascending=False)
-    
-    fig1 = px.bar(
-        x=produccion_dep.values / 1000,
-        y=produccion_dep.index,
-        orientation='h',
-        title='Ranking Completo de Departamentos por Producción de Cereales',
-        labels={'x': 'Producción (miles de toneladas)', 'y': 'Departamento'},
-        color=produccion_dep.values,
-        color_continuous_scale='Greens'
-    )
-    fig1.update_layout(height=800, showlegend=False)
-    st.plotly_chart(fig1, use_container_width=True)
+with col_filtro_año:
+    # Filtro de Año específico
+    if 'año' in df_filtrado.columns and df_filtrado['año'].notna().any():
+        años_filtro = sorted(df_filtrado['año'].dropna().unique(), reverse=True)
+        año_analisis = st.selectbox(
+            "Selecciona Año para Análisis:",
+            options=['Todos'] + [int(a) for a in años_filtro],
+            index=0,  # Índice 0 = "Todos"
+            help="Filtra los datos por un año específico. Por defecto muestra todos los años."
+        )
+    else:
+        año_analisis = 'Todos'
 
-with col2:
-    st.markdown("### Interpretación")
-    st.markdown(f"""
-    - **Departamentos analizados:** {df_filtrado['departamento'].nunique()}
-    - **Líder en producción:** {produccion_dep.index[0]}
-    - **Producción líder:** {produccion_dep.values[0]/1000:.1f}K ton
-    - **Concentración:** Los top 5 representan el {(produccion_dep.head(5).sum() / produccion_dep.sum() * 100):.1f}% del total
-    
-    Esta visualización muestra el ranking completo de departamentos productores de cereales en Colombia.
-    """)
+# Aplicar filtro de año
+if año_analisis != 'Todos':
+    df_filtrado = df_filtrado[df_filtrado['año'] == año_analisis]
+
+# Validar que hay datos después de aplicar filtros adicionales
+if df_filtrado.empty:
+    st.warning("⚠️ No hay datos disponibles con los filtros seleccionados. Por favor, ajusta tus selecciones.")
+    st.stop()
 
 st.markdown("---")
 
-# ==================== VISUALIZACIÓN 2: COMPARACIÓN DE CEREALES ====================
-st.markdown("## Visualización 2: Comparación entre Tipos de Cereales")
-
-col1, col2 = st.columns(2)
-
-with col1:
-    # Producción por tipo de cereal (ordenado de mayor a menor)
-    produccion_cereal = df_filtrado.groupby('cultivo')['produccion'].sum().sort_values(ascending=False)
-    
-    fig2 = go.Figure(data=[go.Pie(
-        labels=produccion_cereal.index,
-        values=produccion_cereal.values,
-        hole=0.4,
-        marker=dict(colors=px.colors.sequential.Greens)
-    )])
-    fig2.update_layout(
-        title='Distribución de Producción por Tipo de Cereal',
-        height=400
-    )
-    st.plotly_chart(fig2, use_container_width=True)
-
-with col2:
-    # Rendimiento por tipo de cereal
-    rendimiento_cereal = df_filtrado.groupby('cultivo')['rendimiento'].mean().sort_values(ascending=False)
-    
-    fig3 = px.bar(
-        x=rendimiento_cereal.index,
-        y=rendimiento_cereal.values,
-        title='Rendimiento Promedio por Tipo de Cereal',
-        labels={'x': 'Cereal', 'y': 'Rendimiento (t/ha)'},
-        color=rendimiento_cereal.values,
-        color_continuous_scale='Oranges'
-    )
-    fig3.update_layout(height=400, showlegend=False)
-    st.plotly_chart(fig3, use_container_width=True)
-
-st.markdown("### Análisis Comparativo")
-st.markdown(f"""
-- **Cereal más producido:** {produccion_cereal.index[0]} ({produccion_cereal.values[0]/1000:.1f}K ton)
-- **Mayor rendimiento:** {rendimiento_cereal.index[0]} ({rendimiento_cereal.values[0]:.2f} t/ha)
-- **Tipos de cereales analizados:** {len(produccion_cereal)}
-
-Comparando producción vs rendimiento, podemos identificar cereales con alta productividad.
-""")
-
-st.markdown("---")
-
-# ==================== VISUALIZACIÓN 3: EVOLUCIÓN TEMPORAL ====================
-st.markdown("## Visualización 3: Evolución Temporal de la Producción")
+# ==================== VISUALIZACIÓN 1: EVOLUCIÓN TEMPORAL (MACRO) ====================
+st.markdown("## Visualización 1: Evolución Temporal de la Producción de Arroz (Visión Macro)")
 
 if 'año' in df_filtrado.columns and df_filtrado['año'].notna().sum() > 0:
     # Producción por año
@@ -263,39 +231,39 @@ if 'año' in df_filtrado.columns and df_filtrado['año'].notna().sum() > 0:
         'rendimiento': 'mean'
     }).reset_index()
     
-    fig4 = make_subplots(
+    fig1 = make_subplots(
         rows=2, cols=1,
         subplot_titles=('Producción y Área Sembrada por Año', 'Rendimiento Promedio por Año'),
         specs=[[{"secondary_y": True}], [{"secondary_y": False}]]
     )
     
     # Gráfico 1: Producción y Área
-    fig4.add_trace(
+    fig1.add_trace(
         go.Scatter(x=produccion_año['año'], y=produccion_año['produccion']/1000,
                    name='Producción (K ton)', line=dict(color='green', width=3)),
         row=1, col=1, secondary_y=False
     )
-    fig4.add_trace(
+    fig1.add_trace(
         go.Scatter(x=produccion_año['año'], y=produccion_año['area_sembrada']/1000,
                    name='Área Sembrada (K ha)', line=dict(color='orange', width=3, dash='dash')),
         row=1, col=1, secondary_y=True
     )
     
     # Gráfico 2: Rendimiento
-    fig4.add_trace(
+    fig1.add_trace(
         go.Scatter(x=produccion_año['año'], y=produccion_año['rendimiento'],
                    name='Rendimiento (t/ha)', line=dict(color='blue', width=3),
                    fill='tozeroy'),
         row=2, col=1
     )
     
-    fig4.update_xaxes(title_text="Año", row=2, col=1)
-    fig4.update_yaxes(title_text="Producción (K ton)", row=1, col=1, secondary_y=False)
-    fig4.update_yaxes(title_text="Área (K ha)", row=1, col=1, secondary_y=True)
-    fig4.update_yaxes(title_text="Rendimiento (t/ha)", row=2, col=1)
+    fig1.update_xaxes(title_text="Año", row=2, col=1)
+    fig1.update_yaxes(title_text="Producción (K ton)", row=1, col=1, secondary_y=False)
+    fig1.update_yaxes(title_text="Área (K ha)", row=1, col=1, secondary_y=True)
+    fig1.update_yaxes(title_text="Rendimiento (t/ha)", row=2, col=1)
     
-    fig4.update_layout(height=600, showlegend=True)
-    st.plotly_chart(fig4, use_container_width=True)
+    fig1.update_layout(height=600, showlegend=True)
+    st.plotly_chart(fig1, use_container_width=True)
     
     # Cálculo de tendencias
     años_total = produccion_año['año'].nunique()
@@ -304,70 +272,107 @@ if 'año' in df_filtrado.columns and df_filtrado['año'].notna().sum() > 0:
     cambio_porcentual = ((prod_fin - prod_inicio) / prod_inicio * 100) if prod_inicio > 0 else 0
     
     st.markdown(f"""
-    ### Análisis Temporal
+    ### Análisis Temporal (Macro)
     - **Período analizado:** {int(produccion_año['año'].min())} - {int(produccion_año['año'].max())} ({años_total} años)
     - **Cambio en producción:** {cambio_porcentual:+.1f}%
     - **Tendencia:** {'Creciente' if cambio_porcentual > 5 else 'Decreciente' if cambio_porcentual < -5 else 'Estable'}
+    - **Producción promedio anual:** {produccion_año['produccion'].mean()/1000:.1f}K ton
     
-    La evolución temporal permite identificar tendencias de crecimiento o decrecimiento en la producción cerealera.
+    Esta visión macro muestra la evolución histórica de la producción arrocera en Colombia.
     """)
 else:
-    st.warning("⚠️ No hay datos temporales disponibles en el filtro actual.")
+    st.warning("⚠️ No hay datos temporales disponibles.")
 
 st.markdown("---")
 
-# ==================== VISUALIZACIÓN 4: SISTEMAS PRODUCTIVOS ====================
-st.markdown("## Visualización 4: Comparación de Sistemas Productivos")
+# ==================== VISUALIZACIÓN 2: DISTRIBUCIÓN GEOGRÁFICA (MACRO) ====================
+st.markdown("## Visualización 2: Distribución Geográfica de la Producción de Arroz (Visión Macro)")
+
+col1, col2 = st.columns([2, 1])
+
+with col1:
+    # Producción por departamento - Ranking completo (mayor a menor, de arriba hacia abajo)
+    produccion_dep = df_filtrado.groupby('departamento')['produccion'].sum().sort_values(ascending=True)  # Invertido para gráfico horizontal
+    
+    fig2 = px.bar(
+        x=produccion_dep.values / 1000,
+        y=produccion_dep.index,
+        orientation='h',
+        title='Ranking Completo de Departamentos por Producción de Arroz',
+        labels={'x': 'Producción (miles de toneladas)', 'y': 'Departamento'},
+        color=produccion_dep.values,
+        color_continuous_scale='Greens'
+    )
+    fig2.update_layout(height=800, showlegend=False)
+    st.plotly_chart(fig2, use_container_width=True)
+
+with col2:
+    st.markdown("### Interpretación Macro")
+    produccion_dep_desc = produccion_dep.sort_values(ascending=False)  # Para mostrar estadísticas correctas
+    st.markdown(f"""
+    - **Departamentos productores:** {df_filtrado['departamento'].nunique()}
+    - **Líder en producción:** {produccion_dep_desc.index[0]}
+    - **Producción líder:** {produccion_dep_desc.values[0]/1000:.1f}K ton
+    - **Concentración:** Los top 5 representan el {(produccion_dep_desc.head(5).sum() / produccion_dep_desc.sum() * 100):.1f}% del total
+    
+    Esta visión macro muestra la distribución espacial de la producción arrocera en Colombia.
+    """)
+
+st.markdown("---")
+
+# ==================== VISUALIZACIÓN 3: SISTEMAS PRODUCTIVOS (ESPECÍFICO) ====================
+st.markdown("## Visualización 3: Sistemas Productivos de Arroz (Análisis Específico)")
 
 if 'sistema_productivo' in df_filtrado.columns and df_filtrado['sistema_productivo'].notna().sum() > 0:
     col1, col2 = st.columns(2)
     
     with col1:
-        # Producción por sistema productivo (ranking completo)
-        sistemas = df_filtrado.groupby('sistema_productivo')['produccion'].sum().sort_values(ascending=False)
+        # Producción por sistema productivo (ranking completo, mayor arriba)
+        sistemas = df_filtrado.groupby('sistema_productivo')['produccion'].sum().sort_values(ascending=True)  # Invertido para gráfico horizontal
         
-        fig5 = px.bar(
+        fig3 = px.bar(
             x=sistemas.values / 1000,
             y=sistemas.index,
             orientation='h',
-            title='Ranking Completo de Sistemas Productivos por Producción',
+            title='Ranking de Sistemas Productivos por Producción',
             labels={'x': 'Producción (K ton)', 'y': 'Sistema Productivo'},
             color=sistemas.values,
             color_continuous_scale='Blues'
         )
-        fig5.update_layout(height=600, showlegend=False)
-        st.plotly_chart(fig5, use_container_width=True)
+        fig3.update_layout(height=600, showlegend=False)
+        st.plotly_chart(fig3, use_container_width=True)
     
     with col2:
-        # Rendimiento por sistema productivo (ranking completo)
+        # Rendimiento por sistema productivo (ranking completo, mayor a menor)
         rend_sistemas = df_filtrado.groupby('sistema_productivo')['rendimiento'].mean().sort_values(ascending=False)
         
-        fig6 = px.bar(
+        fig4 = px.bar(
             x=rend_sistemas.index,
             y=rend_sistemas.values,
-            title='Ranking Completo de Sistemas por Rendimiento Promedio',
+            title='Ranking de Sistemas por Rendimiento Promedio',
             labels={'x': 'Sistema Productivo', 'y': 'Rendimiento (t/ha)'},
             color=rend_sistemas.values,
             color_continuous_scale='RdYlGn'
         )
-        fig6.update_layout(height=600, showlegend=False, xaxis_tickangle=-45)
-        st.plotly_chart(fig6, use_container_width=True)
+        fig4.update_layout(height=600, showlegend=False, xaxis_tickangle=-45, xaxis={'categoryorder':'total descending'})
+        st.plotly_chart(fig4, use_container_width=True)
     
+    sistemas_desc = sistemas.sort_values(ascending=False)  # Para estadísticas correctas
     st.markdown(f"""
-    ### Análisis de Sistemas Productivos
+    ### Análisis de Sistemas Productivos (Específico)
     - **Sistemas identificados:** {df_filtrado['sistema_productivo'].nunique()}
-    - **Sistema más productivo:** {sistemas.index[0]}
+    - **Sistema más productivo:** {sistemas_desc.index[0]}
     - **Mayor rendimiento:** {rend_sistemas.index[0]} ({rend_sistemas.values[0]:.2f} t/ha)
     
-    Diferentes sistemas productivos (riego, secano, tecnificado) muestran variaciones en eficiencia.
+    Este análisis específico muestra las diferencias en eficiencia entre sistemas productivos de arroz (riego, secano, mecanizado, etc.).
     """)
 else:
-    st.info("ℹ️ No hay datos de sistemas productivos disponibles en el filtro actual.")
+    st.info("ℹ️ No hay datos de sistemas productivos disponibles.")
 
 st.markdown("---")
 
 # ==================== TABLA DE DATOS ====================
-st.markdown("## Tabla de Datos Completos")
+st.markdown("## Tabla de Datos Filtrados")
 
 with st.expander("Ver datos detallados (primeras 100 filas)"):
     st.dataframe(
@@ -379,9 +384,9 @@ with st.expander("Ver datos detallados (primeras 100 filas)"):
     # Botón de descarga
     csv = df_filtrado.to_csv(index=False).encode('utf-8')
     st.download_button(
-        label="Descargar datos completos (CSV)",
+        label="Descargar datos filtrados (CSV)",
         data=csv,
-        file_name=f'cereales_completo_{datetime.now().strftime("%Y%m%d")}.csv',
+        file_name=f'cereales_filtrado_{datetime.now().strftime("%Y%m%d")}.csv',
         mime='text/csv',
     )
 
@@ -405,6 +410,8 @@ with st.expander("Información sobre la fuente de datos y actualización"):
     
     **Última actualización de datos:** Febrero 2026
     
+    **Cultivo analizado:** Arroz (filtrado desde el dataset completo de cereales)
+    
     ---
     
     ### Actualización de Datos
@@ -422,13 +429,24 @@ with st.expander("Información sobre la fuente de datos y actualización"):
     
     ### Descripción del Dataset
     
-    - **Registros totales (cereales):** {len(df):,}
+    - **Registros totales (arroz):** {len(df):,}
     - **Registros filtrados actualmente:** {len(df_filtrado):,}
     - **Variables:** {len(df.columns)}
     - **Período temporal:** {int(df['año'].min()) if 'año' in df.columns else 'N/A'} - {int(df['año'].max()) if 'año' in df.columns else 'N/A'}
-    - **Cereales incluidos:** {', '.join(sorted(df['cultivo'].unique()))}
+    - **Cultivo:** Arroz
     - **Departamentos cubiertos:** {df['departamento'].nunique()}
     - **Municipios cubiertos:** {df['municipio'].nunique()}
+    
+    ---
+    
+    ### Enfoque Metodológico
+    
+    **EDA de Macro a Específico:**
+    1. **Nivel Macro - Temporal:** Evolución histórica de la producción
+    2. **Nivel Macro - Espacial:** Distribución geográfica por departamentos
+    3. **Nivel Específico:** Análisis de sistemas productivos y rendimientos
+    
+    Este enfoque permite comprender primero el panorama general antes de profundizar en detalles específicos.
     
     ---
     
@@ -447,7 +465,7 @@ with st.expander("Información sobre la fuente de datos y actualización"):
 st.markdown("---")
 st.markdown("""
 <div style='text-align: center; color: gray; padding: 1rem;'>
-    <p>Dashboard de Producción de Cereales en Colombia | Grupo 2 MAD | 2026</p>
+    <p>Dashboard de Producción de Arroz en Colombia - EDA de Macro a Específico | Grupo 2 MAD | 2026</p>
     <p><small>Desarrollado con Streamlit | Datos: Ministerio de Agricultura de Colombia</small></p>
 </div>
 """, unsafe_allow_html=True)
