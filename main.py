@@ -464,14 +464,18 @@ fig_mapa = px.scatter_mapbox(
         'lon': False,
         'produccion_label': False
     },
-    color_continuous_scale='YlGn',
-    size_max=50,
+    color_continuous_scale='YlGn',  # Amarillo-verde: ideal para cultivos y agricultura
+    size_max=70,  # Aumentado de 50 a 70 para círculos más grandes
     title='Mapa de Producción de Arroz por Departamento en Colombia',
     labels={'produccion': 'Producción (ton)'},
-    zoom=5,
+    zoom=4.8,  # Ajustado para mejor vista
     center={"lat": 4.5709, "lon": -74.2973}
 )
-fig_mapa.update_traces(textfont=dict(size=9, color='black'), textposition='top center')
+fig_mapa.update_traces(
+    textfont=dict(size=10, color='darkgreen', family='Arial Black'), 
+    textposition='top center',
+    marker=dict(opacity=0.85)  # Mayor opacidad para mejor visibilidad
+)
 
 # Configurar estilo del mapa (minimalista para mejor visualización)
 fig_mapa.update_layout(
