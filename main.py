@@ -117,7 +117,6 @@ departamentos_seleccionados = st.sidebar.multiselect(
 )
 
 st.sidebar.markdown("---")
-st.sidebar.info("Todos los departamentos están seleccionados por defecto. Modifica los filtros para personalizar tu análisis.")
 
 # ==================== APLICAR FILTROS ====================
 df_filtrado = df.copy()
@@ -136,21 +135,77 @@ st.markdown('<div class="main-header">Dashboard: Producción de Arroz en Colombi
 
 st.markdown("""
 <div class="info-box">
-    <h3>Contexto del Dashboard - EDA de Macro a Específico</h3>
-    <p><strong>Objetivo:</strong> Analizar la producción de arroz en Colombia mediante un enfoque estructurado 
-    que va de lo general a lo particular, utilizando datos de las Evaluaciones Agropecuarias Municipales (EVA) 
+    <h3>Contexto del Dashboard</h3>
+    <p><strong>Objetivo:</strong> Analizar la producción de arroz en Colombia utilizando datos de las Evaluaciones Agropecuarias Municipales (EVA) 
     del Ministerio de Agricultura.</p>
-    <p><strong>Preguntas Analíticas:</strong></p>
+    <p><strong>Preguntas:</strong></p>
     <ul>
-        <li>¿Cómo ha evolucionado la producción de arroz a lo largo del tiempo? (Macro - Temporal)</li>
-        <li>¿Cuál es la distribución geográfica de la producción? (Macro - Espacial)</li>
-        <li>¿Qué sistemas productivos se utilizan y cuál es su eficiencia? (Específico - Sistemas)</li>
-        <li>¿Cómo se comparan los rendimientos entre regiones? (Específico - Rendimientos)</li>
+        <li>¿Cómo ha evolucionado la producción de arroz a lo largo del tiempo en Colombia?</li>
+        <li>¿Cuál es la distribución geográfica de la producción de arroz en Colombia?</li>
+        <li>¿Qué sistemas productivos se utilizan y cuál es su eficiencia?</li>
+        <li>¿Cómo se comparan los rendimientos entre regiones?</li>
     </ul>
-    <p><strong>Instrucciones:</strong> Las visualizaciones están organizadas de lo macro (visión general) a lo específico (detalles). 
-    Utiliza los filtros para personalizar tu análisis.</p>
 </div>
 """, unsafe_allow_html=True)
+
+# ==================== FILTROS ADICIONALES ====================
+st.markdown("## Filtros de Análisis")
+
+col_filtro1, col_filtro2, col_filtro3 = st.columns(3)
+
+with col_filtro1:
+    # Filtro de Año específico
+    if 'año' in df_filtrado.columns and df_filtrado['año'].notna().any():
+        años_filtro = sorted(df_filtrado['año'].dropna().unique(), reverse=True)
+        año_analisis = st.selectbox(
+            "Selecciona Año para Análisis:",
+            options=['Todos'] + [int(a) for a in años_filtro],
+            index=0,  # Índice 0 = "Todos"
+            help="Filtra los datos por un año específico. Por defecto muestra todos los años."
+        )
+    else:
+        año_analisis = 'Todos'
+
+with col_filtro2:
+    # Filtro de Departamentos
+    departamentos_filtro = sorted(df_filtrado['departamento'].unique())
+    departamento_analisis = st.selectbox(
+        "Selecciona Departamento:",
+        options=['Todos'] + departamentos_filtro,
+        index=0,
+        help="Filtra los datos por un departamento específico. Por defecto muestra todos."
+    )
+
+with col_filtro3:
+    # Filtro de Municipios (depende del departamento seleccionado)
+    if departamento_analisis != 'Todos':
+        municipios_filtro = sorted(df_filtrado[df_filtrado['departamento'] == departamento_analisis]['municipio'].unique())
+    else:
+        municipios_filtro = sorted(df_filtrado['municipio'].unique())
+    
+    municipio_analisis = st.selectbox(
+        "Selecciona Municipio:",
+        options=['Todos'] + municipios_filtro,
+        index=0,
+        help="Filtra los datos por un municipio específico. Por defecto muestra todos."
+    )
+
+# Aplicar filtros
+if año_analisis != 'Todos':
+    df_filtrado = df_filtrado[df_filtrado['año'] == año_analisis]
+
+if departamento_analisis != 'Todos':
+    df_filtrado = df_filtrado[df_filtrado['departamento'] == departamento_analisis]
+
+if municipio_analisis != 'Todos':
+    df_filtrado = df_filtrado[df_filtrado['municipio'] == municipio_analisis]
+
+# Validar que hay datos después de aplicar filtros adicionales
+if df_filtrado.empty:
+    st.warning("No hay datos disponibles con los filtros seleccionados. Por favor, ajusta tus selecciones.")
+    st.stop()
+
+st.markdown("---")
 
 # ==================== MÉTRICAS PRINCIPALES ====================
 st.markdown("## Métricas Principales")
@@ -191,37 +246,12 @@ with col4:
 
 st.markdown("---")
 
-# ==================== FILTROS ADICIONALES ====================
-st.markdown("## Filtros de Análisis")
-
-col_filtro_año = st.columns([1, 2])[0]
-
-with col_filtro_año:
-    # Filtro de Año específico
-    if 'año' in df_filtrado.columns and df_filtrado['año'].notna().any():
-        años_filtro = sorted(df_filtrado['año'].dropna().unique(), reverse=True)
-        año_analisis = st.selectbox(
-            "Selecciona Año para Análisis:",
-            options=['Todos'] + [int(a) for a in años_filtro],
-            index=0,  # Índice 0 = "Todos"
-            help="Filtra los datos por un año específico. Por defecto muestra todos los años."
-        )
-    else:
-        año_analisis = 'Todos'
-
-# Aplicar filtro de año
-if año_analisis != 'Todos':
-    df_filtrado = df_filtrado[df_filtrado['año'] == año_analisis]
-
-# Validar que hay datos después de aplicar filtros adicionales
-if df_filtrado.empty:
-    st.warning("⚠️ No hay datos disponibles con los filtros seleccionados. Por favor, ajusta tus selecciones.")
-    st.stop()
-
+# ==================== SECCIÓN 1: ANÁLISIS MACRO - VISIÓN GENERAL ====================
+st.markdown("# SECCIÓN 1: Análisis Macro - Visión General")
 st.markdown("---")
 
-# ==================== VISUALIZACIÓN 1: EVOLUCIÓN TEMPORAL (MACRO) ====================
-st.markdown("## Visualización 1: Evolución Temporal de la Producción de Arroz (Visión Macro)")
+# ==================== VISUALIZACIÓN 1.1: EVOLUCIÓN TEMPORAL ====================
+st.markdown("## 1.1 Evolución Temporal de la Producción de Arroz")
 
 if 'año' in df_filtrado.columns and df_filtrado['año'].notna().sum() > 0:
     # Producción por año
@@ -281,12 +311,12 @@ if 'año' in df_filtrado.columns and df_filtrado['año'].notna().sum() > 0:
     Esta visión macro muestra la evolución histórica de la producción arrocera en Colombia.
     """)
 else:
-    st.warning("⚠️ No hay datos temporales disponibles.")
+    st.warning("No hay datos temporales disponibles.")
 
 st.markdown("---")
 
-# ==================== VISUALIZACIÓN 2: DISTRIBUCIÓN GEOGRÁFICA (MACRO) ====================
-st.markdown("## Visualización 2: Distribución Geográfica de la Producción de Arroz (Visión Macro)")
+# ==================== VISUALIZACIÓN 1.2: DISTRIBUCIÓN GEOGRÁFICA ====================
+st.markdown("## 1.2 Distribución Geográfica por Departamento")
 
 col1, col2 = st.columns([2, 1])
 
@@ -320,8 +350,337 @@ with col2:
 
 st.markdown("---")
 
-# ==================== VISUALIZACIÓN 3: SISTEMAS PRODUCTIVOS (ESPECÍFICO) ====================
-st.markdown("## Visualización 3: Sistemas Productivos de Arroz (Análisis Específico)")
+# ==================== VISUALIZACIÓN 1.3: MAPA DE CALOR GEOGRÁFICO ====================
+st.markdown("## 1.3 Mapa de Calor de Producción por Departamento")
+
+# Agrupar producción por municipio y departamento
+produccion_municipios = df_filtrado.groupby(['departamento', 'municipio']).agg({
+    'produccion': 'sum',
+    'area_sembrada': 'sum',
+    'rendimiento': 'mean'
+}).reset_index()
+
+# Crear un identificador único para cada municipio
+produccion_municipios['municipio_completo'] = (
+    produccion_municipios['municipio'] + ', ' + produccion_municipios['departamento']
+)
+
+# Ordenar por producción
+produccion_municipios = produccion_municipios.sort_values('produccion', ascending=False)
+
+# Agrupar por departamento para el mapa
+produccion_departamentos = df_filtrado.groupby('departamento').agg({
+    'produccion': 'sum',
+    'area_sembrada': 'sum',
+    'rendimiento': 'mean'
+}).reset_index()
+
+# Coordenadas aproximadas de los departamentos de Colombia (capitales)
+coordenadas_dept = {
+    'ANTIOQUIA': {'lat': 6.2518, 'lon': -75.5636},
+    'ATLANTICO': {'lat': 10.9639, 'lon': -74.7964},
+    'BOLIVAR': {'lat': 10.3910, 'lon': -75.4794},
+    'BOYACA': {'lat': 5.4545, 'lon': -73.3625},
+    'CALDAS': {'lat': 5.0689, 'lon': -75.5174},
+    'CAQUETA': {'lat': 1.6144, 'lon': -75.6062},
+    'CAUCA': {'lat': 2.4448, 'lon': -76.6147},
+    'CESAR': {'lat': 10.4631, 'lon': -73.2532},
+    'CORDOBA': {'lat': 8.7479, 'lon': -75.8814},
+    'CUNDINAMARCA': {'lat': 4.7110, 'lon': -74.0721},
+    'CHOCO': {'lat': 5.6983, 'lon': -76.6583},
+    'HUILA': {'lat': 2.9273, 'lon': -75.2819},
+    'LA GUAJIRA': {'lat': 11.5448, 'lon': -72.9072},
+    'MAGDALENA': {'lat': 11.2408, 'lon': -74.1990},
+    'META': {'lat': 4.1420, 'lon': -73.6266},
+    'NARIÑO': {'lat': 1.2136, 'lon': -77.2811},
+    'NORTE DE SANTANDER': {'lat': 7.8939, 'lon': -72.5078},
+    'QUINDIO': {'lat': 4.4610, 'lon': -75.6674},
+    'RISARALDA': {'lat': 4.8087, 'lon': -75.6906},
+    'SANTANDER': {'lat': 7.1254, 'lon': -73.1198},
+    'SUCRE': {'lat': 9.2985, 'lon': -75.3976},
+    'TOLIMA': {'lat': 4.4389, 'lon': -75.2322},
+    'VALLE DEL CAUCA': {'lat': 3.4516, 'lon': -76.5320},
+    'ARAUCA': {'lat': 7.0904, 'lon': -70.7619},
+    'CASANARE': {'lat': 5.3356, 'lon': -72.3959},
+    'PUTUMAYO': {'lat': 0.8667, 'lon': -76.8500},
+    'ARCHIPIELAGO DE SAN ANDRES PROVIDENCIA Y SANTA CATALINA': {'lat': 12.5847, 'lon': -81.7006},
+    'AMAZONAS': {'lat': -4.2051, 'lon': -69.9406},
+    'GUAINIA': {'lat': 2.5833, 'lon': -67.9167},
+    'GUAVIARE': {'lat': 2.5700, 'lon': -72.6367},
+    'VAUPES': {'lat': 0.8333, 'lon': -70.8167},
+    'VICHADA': {'lat': 4.4167, 'lon': -69.2833}
+}
+
+# Agregar coordenadas a los datos de producción
+produccion_departamentos['lat'] = produccion_departamentos['departamento'].map(
+    lambda x: coordenadas_dept.get(x.upper(), {}).get('lat', None)
+)
+produccion_departamentos['lon'] = produccion_departamentos['departamento'].map(
+    lambda x: coordenadas_dept.get(x.upper(), {}).get('lon', None)
+)
+
+# Filtrar departamentos sin coordenadas
+produccion_departamentos_mapa = produccion_departamentos.dropna(subset=['lat', 'lon'])
+
+# Crear mapa de burbujas
+fig_mapa = px.scatter_geo(
+    produccion_departamentos_mapa,
+    lat='lat',
+    lon='lon',
+    size='produccion',
+    color='produccion',
+    hover_name='departamento',
+    hover_data={
+        'produccion': ':.2f',
+        'area_sembrada': ':.2f',
+        'rendimiento': ':.2f',
+        'lat': False,
+        'lon': False
+    },
+    color_continuous_scale='YlGn',
+    size_max=50,
+    title='Mapa de Producción de Arroz por Departamento en Colombia',
+    labels={'produccion': 'Producción (ton)'}
+)
+
+# Configurar el mapa centrado en Colombia
+fig_mapa.update_geos(
+    resolution=50,
+    showcountries=True,
+    countrycolor="lightgray",
+    showcoastlines=True,
+    coastlinecolor="gray",
+    projection_type="mercator",
+    lonaxis_range=[-82, -66],
+    lataxis_range=[-5, 13],
+    showland=True,
+    landcolor="rgb(243, 243, 243)",
+    showocean=True,
+    oceancolor="rgb(204, 229, 255)"
+)
+
+fig_mapa.update_layout(height=700)
+st.plotly_chart(fig_mapa, use_container_width=True)
+
+# Tabla con Top 10 municipios
+col_top1, col_top2 = st.columns(2)
+
+with col_top1:
+    st.markdown("### Top 10 Municipios por Producción")
+    top_municipios = produccion_municipios.head(10)[['municipio_completo', 'produccion', 'area_sembrada', 'rendimiento']].copy()
+    top_municipios['produccion'] = (top_municipios['produccion'] / 1000).round(2)
+    top_municipios['area_sembrada'] = top_municipios['area_sembrada'].round(2)
+    top_municipios['rendimiento'] = top_municipios['rendimiento'].round(2)
+    top_municipios.columns = ['Municipio', 'Producción (K ton)', 'Área (ha)', 'Rendimiento (t/ha)']
+    st.dataframe(top_municipios, hide_index=True, use_container_width=True)
+
+with col_top2:
+    st.markdown("### Estadísticas Municipales")
+    total_municipios = len(produccion_municipios)
+    prod_top10 = produccion_municipios.head(10)['produccion'].sum()
+    prod_total = produccion_municipios['produccion'].sum()
+    concentracion = (prod_top10 / prod_total * 100) if prod_total > 0 else 0
+    
+    st.markdown(f"""
+    - **Total de municipios productores:** {total_municipios}
+    - **Municipio líder:** {produccion_municipios.iloc[0]['municipio_completo']}
+    - **Producción del líder:** {produccion_municipios.iloc[0]['produccion']/1000:.2f}K ton
+    - **Concentración Top 10:** {concentracion:.1f}% de la producción total
+    - **Mayor rendimiento municipal:** {produccion_municipios.loc[produccion_municipios['rendimiento'].idxmax(), 'municipio_completo']} ({produccion_municipios['rendimiento'].max():.2f} t/ha)
+    
+    El mapa de calor muestra la concentración geográfica de la producción arrocera a nivel municipal.
+    """)
+
+st.markdown("---")
+
+# ==================== SECCIÓN 2: ANÁLISIS DE EFICIENCIA Y PÉRDIDAS ====================
+st.markdown("# SECCIÓN 2: Análisis de Eficiencia y Pérdidas Agrícolas")
+st.markdown("---")
+
+# ==================== VISUALIZACIÓN 2.1: EFICIENCIA DE COSECHA ====================
+st.markdown("## 2.1 Análisis de Pérdidas: Área Sembrada vs Cosechada")
+
+if 'area_cosechada' in df_filtrado.columns and df_filtrado['area_cosechada'].notna().sum() > 0:
+    # Calcular eficiencia por departamento
+    eficiencia_dept = df_filtrado.groupby('departamento').agg({
+        'area_sembrada': 'sum',
+        'area_cosechada': 'sum',
+        'produccion': 'sum'
+    }).reset_index()
+    
+    eficiencia_dept['perdida'] = eficiencia_dept['area_sembrada'] - eficiencia_dept['area_cosechada']
+    eficiencia_dept['eficiencia_%'] = (eficiencia_dept['area_cosechada'] / eficiencia_dept['area_sembrada'] * 100).round(2)
+    eficiencia_dept = eficiencia_dept.sort_values('perdida', ascending=False)
+    
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        # Gráfico de barras apiladas
+        fig_efic1 = go.Figure()
+        
+        fig_efic1.add_trace(go.Bar(
+            y=eficiencia_dept['departamento'].head(15),
+            x=eficiencia_dept['area_cosechada'].head(15),
+            name='Área Cosechada',
+            orientation='h',
+            marker=dict(color='green')
+        ))
+        
+        fig_efic1.add_trace(go.Bar(
+            y=eficiencia_dept['departamento'].head(15),
+            x=eficiencia_dept['perdida'].head(15),
+            name='Área No Cosechada (Pérdida)',
+            orientation='h',
+            marker=dict(color='red')
+        ))
+        
+        fig_efic1.update_layout(
+            barmode='stack',
+            title='Top 15 Departamentos: Área Sembrada vs Cosechada',
+            xaxis_title='Hectáreas',
+            yaxis_title='Departamento',
+            height=600,
+            legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
+        )
+        st.plotly_chart(fig_efic1, use_container_width=True)
+    
+    with col2:
+        # Gráfico de eficiencia porcentual
+        fig_efic2 = px.bar(
+            eficiencia_dept.head(15),
+            y='departamento',
+            x='eficiencia_%',
+            orientation='h',
+            title='Top 15: Eficiencia de Cosecha (%)',
+            labels={'eficiencia_%': 'Eficiencia (%)', 'departamento': 'Departamento'},
+            color='eficiencia_%',
+            color_continuous_scale='RdYlGn',
+            range_color=[80, 100]
+        )
+        fig_efic2.update_layout(height=600)
+        st.plotly_chart(fig_efic2, use_container_width=True)
+    
+    # Métricas de eficiencia
+    perdida_total = eficiencia_dept['perdida'].sum()
+    area_sembrada_total = eficiencia_dept['area_sembrada'].sum()
+    eficiencia_promedio = (eficiencia_dept['area_cosechada'].sum() / area_sembrada_total * 100)
+    
+    col_m1, col_m2, col_m3 = st.columns(3)
+    with col_m1:
+        st.metric("Área Total Sembrada", f"{area_sembrada_total/1000:.1f}K ha")
+    with col_m2:
+        st.metric("Área No Cosechada (Pérdida)", f"{perdida_total/1000:.1f}K ha", 
+                  delta=f"-{(perdida_total/area_sembrada_total*100):.1f}%", delta_color="inverse")
+    with col_m3:
+        st.metric("Eficiencia Promedio Nacional", f"{eficiencia_promedio:.1f}%")
+    
+    st.info("""
+    **Interpretación:** La diferencia entre área sembrada y cosechada indica pérdidas por factores climáticos, 
+    plagas, enfermedades o problemas logísticos. Una eficiencia menor al 90% puede indicar problemas significativos.
+    """)
+else:
+    st.warning("No hay datos de área cosechada disponibles.")
+
+st.markdown("---")
+
+# ==================== VISUALIZACIÓN 2.2: ANÁLISIS DE RENDIMIENTO ====================
+st.markdown("## 2.2 Análisis de Rendimiento y Productividad")
+
+col1, col2 = st.columns(2)
+
+with col1:
+    # Scatter plot: Área sembrada vs Producción
+    scatter_data = df_filtrado.groupby('departamento').agg({
+        'area_sembrada': 'sum',
+        'produccion': 'sum',
+        'rendimiento': 'mean'
+    }).reset_index()
+    
+    fig_scatter = px.scatter(
+        scatter_data,
+        x='area_sembrada',
+        y='produccion',
+        size='rendimiento',
+        color='rendimiento',
+        hover_name='departamento',
+        title='Área Sembrada vs Producción por Departamento',
+        labels={
+            'area_sembrada': 'Área Sembrada (ha)',
+            'produccion': 'Producción (ton)',
+            'rendimiento': 'Rendimiento (t/ha)'
+        },
+        color_continuous_scale='Viridis',
+        size_max=30
+    )
+    fig_scatter.update_layout(height=500)
+    st.plotly_chart(fig_scatter, use_container_width=True)
+    
+    st.info("""
+    **Interpretación:** Los departamentos más alejados de la línea de tendencia pueden tener 
+    rendimientos atípicos (muy altos o muy bajos). El tamaño de la burbuja indica el rendimiento promedio.
+    """)
+
+with col2:
+    # Box plot de rendimientos por región
+    top_10_depts = df_filtrado.groupby('departamento')['produccion'].sum().nlargest(10).index
+    df_top10 = df_filtrado[df_filtrado['departamento'].isin(top_10_depts)]
+    
+    fig_box = px.box(
+        df_top10,
+        x='departamento',
+        y='rendimiento',
+        title='Distribución de Rendimientos: Top 10 Departamentos',
+        labels={'rendimiento': 'Rendimiento (t/ha)', 'departamento': 'Departamento'},
+        color='departamento'
+    )
+    fig_box.update_layout(height=500, showlegend=False, xaxis_tickangle=-45)
+    st.plotly_chart(fig_box, use_container_width=True)
+    
+    st.info("""
+    **Interpretación:** Los box plots muestran la variabilidad del rendimiento. 
+    Cajas más estrechas indican consistencia, mientras que outliers señalan casos extremos.
+    """)
+
+st.markdown("---")
+
+# ==================== VISUALIZACIÓN 2.3: MATRIZ DE CORRELACIÓN ====================
+st.markdown("## 2.3 Correlaciones entre Variables Productivas")
+
+# Preparar datos para correlación
+corr_data = df_filtrado[['area_sembrada', 'area_cosechada', 'produccion', 'rendimiento']].copy()
+corr_data = corr_data.dropna()
+
+if len(corr_data) > 0:
+    correlation_matrix = corr_data.corr()
+    
+    fig_corr = px.imshow(
+        correlation_matrix,
+        text_auto='.2f',
+        aspect='auto',
+        title='Matriz de Correlación entre Variables Productivas',
+        labels=dict(color="Correlación"),
+        color_continuous_scale='RdBu',
+        zmin=-1,
+        zmax=1
+    )
+    fig_corr.update_layout(height=500)
+    st.plotly_chart(fig_corr, use_container_width=True)
+    
+    st.info("""
+    **Interpretación:** Valores cercanos a +1 indican correlación positiva fuerte, 
+    cercanos a -1 correlación negativa, y cercanos a 0 ausencia de correlación lineal.
+    """)
+else:
+    st.warning("No hay suficientes datos para calcular correlaciones.")
+
+st.markdown("---")
+
+# ==================== SECCIÓN 3: ANÁLISIS ESPECÍFICO POR CATEGORÍAS ====================
+st.markdown("# SECCIÓN 3: Análisis Específico por Categorías")
+st.markdown("---")
+
+# ==================== VISUALIZACIÓN 3.1: SISTEMAS PRODUCTIVOS ====================
+st.markdown("## 3.1 Sistemas Productivos de Arroz")
 
 if 'sistema_productivo' in df_filtrado.columns and df_filtrado['sistema_productivo'].notna().sum() > 0:
     col1, col2 = st.columns(2)
@@ -367,7 +726,209 @@ if 'sistema_productivo' in df_filtrado.columns and df_filtrado['sistema_producti
     Este análisis específico muestra las diferencias en eficiencia entre sistemas productivos de arroz (riego, secano, mecanizado, etc.).
     """)
 else:
-    st.info("ℹ️ No hay datos de sistemas productivos disponibles.")
+    st.info("No hay datos de sistemas productivos disponibles.")
+
+st.markdown("---")
+
+# ==================== VISUALIZACIÓN 3.2: ANÁLISIS ESTACIONAL/PERIÓDICO ====================
+st.markdown("## 3.2 Análisis Estacional y por Período")
+
+if 'periodo' in df_filtrado.columns and df_filtrado['periodo'].notna().sum() > 0:
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        # Producción por período
+        produccion_periodo = df_filtrado.groupby('periodo')['produccion'].sum().sort_values(ascending=False)
+        
+        fig_periodo = px.pie(
+            values=produccion_periodo.values,
+            names=produccion_periodo.index,
+            title='Distribución de Producción por Período',
+            color_discrete_sequence=px.colors.sequential.Greens_r
+        )
+        fig_periodo.update_traces(textposition='inside', textinfo='percent+label')
+        fig_periodo.update_layout(height=500)
+        st.plotly_chart(fig_periodo, use_container_width=True)
+    
+    with col2:
+        # Heatmap temporal: Año vs Periodo
+        if 'año' in df_filtrado.columns:
+            heatmap_data = df_filtrado.groupby(['año', 'periodo'])['produccion'].sum().reset_index()
+            heatmap_pivot = heatmap_data.pivot(index='periodo', columns='año', values='produccion')
+            
+            fig_heatmap = px.imshow(
+                heatmap_pivot,
+                title='Mapa de Calor: Producción por Año y Período',
+                labels=dict(x="Año", y="Período", color="Producción (ton)"),
+                color_continuous_scale='YlGn',
+                aspect='auto'
+            )
+            fig_heatmap.update_layout(height=500)
+            st.plotly_chart(fig_heatmap, use_container_width=True)
+    
+    st.info("""
+    **Interpretación:** El análisis estacional muestra si hay concentración de producción 
+    en ciertos períodos del año, lo que puede indicar patrones climáticos o de siembra.
+    """)
+else:
+    st.info("No hay datos de período disponibles.")
+
+st.markdown("---")
+
+# ==================== SECCIÓN 4: ANÁLISIS ESTADÍSTICO AVANZADO ====================
+st.markdown("# SECCIÓN 4: Análisis Estadístico Avanzado")
+st.markdown("---")
+
+# ==================== VISUALIZACIÓN 4.1: DISTRIBUCIONES ====================
+st.markdown("## 4.1 Distribución de Variables Productivas")
+
+col1, col2 = st.columns(2)
+
+with col1:
+    # Histograma de rendimientos
+    fig_hist_rend = px.histogram(
+        df_filtrado,
+        x='rendimiento',
+        nbins=30,
+        title='Distribución de Rendimientos',
+        labels={'rendimiento': 'Rendimiento (t/ha)', 'count': 'Frecuencia'},
+        color_discrete_sequence=['green']
+    )
+    fig_hist_rend.update_layout(
+        height=400, 
+        showlegend=False,
+        xaxis_title='Rendimiento (t/ha)',
+        yaxis_title='count'
+    )
+    st.plotly_chart(fig_hist_rend, use_container_width=True)
+
+with col2:
+    # Histograma de producción por municipio
+    prod_municipio = df_filtrado.groupby('municipio')['produccion'].sum()
+    
+    fig_hist_prod = px.histogram(
+        x=prod_municipio.values,
+        nbins=40,
+        title='Distribución de Producción por Municipio',
+        labels={'x': 'Producción (ton)', 'count': 'Número de Municipios'},
+        color_discrete_sequence=['blue']
+    )
+    fig_hist_prod.update_layout(
+        height=400, 
+        showlegend=False,
+        xaxis_title='Producción (ton)',
+        yaxis_title='count'
+    )
+    st.plotly_chart(fig_hist_prod, use_container_width=True)
+
+st.info("""
+**Interpretación:** Los histogramas muestran la distribución de frecuencias. 
+Distribuciones sesgadas pueden indicar concentración en ciertos valores.
+""")
+
+st.markdown("---")
+
+# ==================== VISUALIZACIÓN 4.2: COMPARATIVA TOP VS BOTTOM ====================
+st.markdown("## 4.2 Comparativa: Top 10 vs Bottom 10 Departamentos")
+
+# Obtener top 10 y bottom 10
+produccion_dep_rank = df_filtrado.groupby('departamento')['produccion'].sum().sort_values()
+
+if len(produccion_dep_rank) >= 10:
+    bottom_10 = produccion_dep_rank.head(10)
+    top_10 = produccion_dep_rank.tail(10)
+    
+    # Crear DataFrame para gráfico divergente
+    comparison_data = pd.DataFrame({
+        'Departamento': list(bottom_10.index) + list(top_10.index),
+        'Producción': list(-bottom_10.values) + list(top_10.values),
+        'Categoría': ['Bottom 10']*10 + ['Top 10']*10
+    })
+    
+    fig_divergente = px.bar(
+        comparison_data,
+        y='Departamento',
+        x='Producción',
+        color='Categoría',
+        orientation='h',
+        title='Comparativa: Top 10 vs Bottom 10 Departamentos por Producción',
+        labels={'Producción': 'Producción (ton)', 'Departamento': 'Departamento'},
+        color_discrete_map={'Top 10': 'green', 'Bottom 10': 'red'}
+    )
+    fig_divergente.update_layout(height=700, xaxis_title='← Bottom 10 | Producción (ton) | Top 10 →')
+    st.plotly_chart(fig_divergente, use_container_width=True)
+    
+    # Estadísticas comparativas
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        st.metric("Promedio Top 10", f"{top_10.mean()/1000:.1f}K ton")
+    with col2:
+        st.metric("Promedio Bottom 10", f"{bottom_10.mean():.0f} ton")
+    with col3:
+        brecha = (top_10.mean() / bottom_10.mean()) if bottom_10.mean() > 0 else 0
+        st.metric("Brecha (veces)", f"{brecha:.1f}x")
+    
+    st.info("""
+    **Interpretación:** Esta visualización divergente contrasta los departamentos más y menos productivos, 
+    revelando la magnitud de las diferencias en la producción nacional.
+    """)
+else:
+    st.warning("No hay suficientes departamentos para realizar esta comparación.")
+
+st.markdown("---")
+
+# ==================== VISUALIZACIÓN 4.3: ANÁLISIS DE CONCENTRACIÓN ====================
+st.markdown("## 4.3 Análisis de Concentración de la Producción")
+
+# Calcular curva de Lorenz
+produccion_municipios_conc = df_filtrado.groupby('municipio')['produccion'].sum().sort_values()
+produccion_acum = produccion_municipios_conc.cumsum()
+produccion_acum_pct = (produccion_acum / produccion_acum.iloc[-1] * 100)
+municipios_pct = np.linspace(0, 100, len(produccion_acum_pct))
+
+# Crear DataFrame para Lorenz
+lorenz_data = pd.DataFrame({
+    'Municipios (%)': municipios_pct,
+    'Producción Acumulada (%)': produccion_acum_pct.values
+})
+
+# Agregar línea de igualdad perfecta
+lorenz_data_completo = pd.concat([
+    pd.DataFrame({'Municipios (%)': [0, 100], 'Producción Acumulada (%)': [0, 100], 'Tipo': ['Igualdad Perfecta', 'Igualdad Perfecta']}),
+    lorenz_data.assign(Tipo='Distribución Real')
+])
+
+fig_lorenz = px.line(
+    lorenz_data_completo,
+    x='Municipios (%)',
+    y='Producción Acumulada (%)',
+    color='Tipo',
+    title='Curva de Lorenz: Concentración de la Producción por Municipio',
+    labels={'Municipios (%)': 'Porcentaje Acumulado de Municipios', 
+            'Producción Acumulada (%)': 'Porcentaje Acumulado de Producción'},
+    color_discrete_map={'Distribución Real': 'green', 'Igualdad Perfecta': 'gray'}
+)
+fig_lorenz.update_traces(line=dict(width=3))
+fig_lorenz.update_layout(height=500)
+st.plotly_chart(fig_lorenz, use_container_width=True)
+
+# Calcular estadísticas de concentración
+top_20_pct_municipios = int(len(produccion_municipios_conc) * 0.2)
+produccion_top_20 = produccion_municipios_conc.tail(top_20_pct_municipios).sum()
+produccion_total_conc = produccion_municipios_conc.sum()
+concentracion_20 = (produccion_top_20 / produccion_total_conc * 100) if produccion_total_conc > 0 else 0
+
+col1, col2 = st.columns(2)
+with col1:
+    st.metric("Concentración en Top 20% de Municipios", f"{concentracion_20:.1f}%")
+with col2:
+    st.metric("Total de Municipios Productores", f"{len(produccion_municipios_conc)}")
+
+st.info("""
+**Interpretación:** La curva de Lorenz muestra el grado de concentración. Cuanto más alejada esté 
+de la línea de igualdad perfecta, mayor es la concentración de la producción en pocos municipios. 
+Si el 20% de municipios produce el 80% o más, hay alta concentración.
+""")
 
 st.markdown("---")
 
@@ -400,30 +961,11 @@ with st.expander("Información sobre la fuente de datos y actualización"):
     ### Fuente de Datos
     
     **Origen:** Evaluaciones Agropecuarias Municipales (EVA) - Ministerio de Agricultura y Desarrollo Rural de Colombia
-    
-    **URL de acceso:** 
-    ```
-    https://www.dropbox.com/scl/fi/e3iwe3z3jszouxues5bai/data21022026.csv
-    ```
-    
-    **Fecha de acceso:** 24 de febrero de 2026
-    
+
     **Última actualización de datos:** Febrero 2026
     
-    **Cultivo analizado:** Arroz (filtrado desde el dataset completo de cereales)
+    **Cultivo analizado:** Arroz
     
-    ---
-    
-    ### Actualización de Datos
-    
-    **Frecuencia recomendada:** Trimestral o según publicación del Ministerio de Agricultura
-    
-    **Proceso de actualización:**
-    1. Descargar el archivo CSV actualizado desde la fuente oficial del Ministerio
-    2. Subir el archivo actualizado al mismo enlace de Dropbox (o actualizar la URL en el código)
-    3. El dashboard se actualizará automáticamente al recargar la página
-    
-    **Contacto para actualizaciones:** Ministerio de Agricultura y Desarrollo Rural - Colombia
     
     ---
     
@@ -439,18 +981,7 @@ with st.expander("Información sobre la fuente de datos y actualización"):
     
     ---
     
-    ### Enfoque Metodológico
-    
-    **EDA de Macro a Específico:**
-    1. **Nivel Macro - Temporal:** Evolución histórica de la producción
-    2. **Nivel Macro - Espacial:** Distribución geográfica por departamentos
-    3. **Nivel Específico:** Análisis de sistemas productivos y rendimientos
-    
-    Este enfoque permite comprender primero el panorama general antes de profundizar en detalles específicos.
-    
-    ---
-    
-    ### Créditos
+    ### Información del Desarrollo
     
     **Desarrollado por:** Grupo 2 - MAD (Métodos Analíticos de Datos)
     
