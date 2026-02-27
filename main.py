@@ -270,12 +270,20 @@ if 'año' in df_filtrado.columns and df_filtrado['año'].notna().sum() > 0:
     # Gráfico 1: Producción y Área
     fig1.add_trace(
         go.Scatter(x=produccion_año['año'], y=produccion_año['produccion']/1000,
-                   name='Producción (K ton)', line=dict(color='green', width=3)),
+                   name='Producción (K ton)', line=dict(color='green', width=3),
+                   mode='lines+markers+text',
+                   text=[f"{val/1000:.1f}" for val in produccion_año['produccion']],
+                   textposition='top center',
+                   textfont=dict(size=10)),
         row=1, col=1, secondary_y=False
     )
     fig1.add_trace(
         go.Scatter(x=produccion_año['año'], y=produccion_año['area_sembrada']/1000,
-                   name='Área Sembrada (K ha)', line=dict(color='orange', width=3, dash='dash')),
+                   name='Área Sembrada (K ha)', line=dict(color='orange', width=3, dash='dash'),
+                   mode='lines+markers+text',
+                   text=[f"{val/1000:.1f}" for val in produccion_año['area_sembrada']],
+                   textposition='bottom center',
+                   textfont=dict(size=10)),
         row=1, col=1, secondary_y=True
     )
     
@@ -283,7 +291,11 @@ if 'año' in df_filtrado.columns and df_filtrado['año'].notna().sum() > 0:
     fig1.add_trace(
         go.Scatter(x=produccion_año['año'], y=produccion_año['rendimiento'],
                    name='Rendimiento (t/ha)', line=dict(color='blue', width=3),
-                   fill='tozeroy'),
+                   fill='tozeroy',
+                   mode='lines+markers+text',
+                   text=[f"{val:.2f}" for val in produccion_año['rendimiento']],
+                   textposition='top center',
+                   textfont=dict(size=10)),
         row=2, col=1
     )
     
@@ -300,16 +312,6 @@ if 'año' in df_filtrado.columns and df_filtrado['año'].notna().sum() > 0:
     prod_inicio = produccion_año.iloc[0]['produccion']
     prod_fin = produccion_año.iloc[-1]['produccion']
     cambio_porcentual = ((prod_fin - prod_inicio) / prod_inicio * 100) if prod_inicio > 0 else 0
-    
-    st.markdown(f"""
-    ### Análisis Temporal (Macro)
-    - **Período analizado:** {int(produccion_año['año'].min())} - {int(produccion_año['año'].max())} ({años_total} años)
-    - **Cambio en producción:** {cambio_porcentual:+.1f}%
-    - **Tendencia:** {'Creciente' if cambio_porcentual > 5 else 'Decreciente' if cambio_porcentual < -5 else 'Estable'}
-    - **Producción promedio anual:** {produccion_año['produccion'].mean()/1000:.1f}K ton
-    
-    Esta visión macro muestra la evolución histórica de la producción arrocera en Colombia.
-    """)
 else:
     st.warning("No hay datos temporales disponibles.")
 
@@ -322,18 +324,39 @@ col1, col2 = st.columns([2, 1])
 
 with col1:
     # Producción por departamento - Ranking completo (mayor a menor, de arriba hacia abajo)
-    produccion_dep = df_filtrado.groupby('departamento')['produccion'].sum().sort_values(ascending=True)  # Invertido para gráfico horizontal
+    produccion_dep = df_filtrado.groupby('departamento')['produccion'].sum().sort_values(ascending=False)
+    
+    # Calcular porcentaje acumulado
+    produccion_dep_acum = produccion_dep.cumsum()
+    porcentaje_acum = (produccion_dep_acum / produccion_dep.sum() * 100).round(1)
+    
+    # Crear DataFrame para el gráfico
+    df_grafico = pd.DataFrame({
+        'departamento': produccion_dep.index,
+        'produccion': produccion_dep.values,
+        'porcentaje_acumulado': porcentaje_acum.values
+    }).sort_values('produccion', ascending=True)  # Invertir para gráfico horizontal
     
     fig2 = px.bar(
-        x=produccion_dep.values / 1000,
-        y=produccion_dep.index,
+        df_grafico,
+        x='produccion',
+        y='departamento',
         orientation='h',
         title='Ranking Completo de Departamentos por Producción de Arroz',
-        labels={'x': 'Producción (miles de toneladas)', 'y': 'Departamento'},
-        color=produccion_dep.values,
-        color_continuous_scale='Greens'
+        labels={'produccion': 'Producción (toneladas)', 'departamento': 'Departamento'},
+        color='produccion',
+        color_continuous_scale='Greens',
+        text='porcentaje_acumulado'
     )
-    fig2.update_layout(height=800, showlegend=False)
+    fig2.update_traces(
+        texttemplate='%{text:.1f}%',
+        textposition='outside'
+    )
+    fig2.update_layout(
+        height=800, 
+        showlegend=False,
+        xaxis_title='Producción (toneladas) | % Acumulado'
+    )
     st.plotly_chart(fig2, use_container_width=True)
 
 with col2:
@@ -422,73 +445,70 @@ produccion_departamentos['lon'] = produccion_departamentos['departamento'].map(
 # Filtrar departamentos sin coordenadas
 produccion_departamentos_mapa = produccion_departamentos.dropna(subset=['lat', 'lon'])
 
-# Crear mapa de burbujas
-fig_mapa = px.scatter_geo(
+# Crear mapa estilo Google Maps
+produccion_departamentos_mapa['produccion_label'] = produccion_departamentos_mapa['produccion'].apply(lambda x: f"{x/1000:.1f}K" if x >= 1000 else f"{x:.0f}")
+
+fig_mapa = px.scatter_mapbox(
     produccion_departamentos_mapa,
     lat='lat',
     lon='lon',
     size='produccion',
     color='produccion',
+    text='produccion_label',
     hover_name='departamento',
     hover_data={
         'produccion': ':.2f',
         'area_sembrada': ':.2f',
         'rendimiento': ':.2f',
         'lat': False,
-        'lon': False
+        'lon': False,
+        'produccion_label': False
     },
     color_continuous_scale='YlGn',
     size_max=50,
     title='Mapa de Producción de Arroz por Departamento en Colombia',
-    labels={'produccion': 'Producción (ton)'}
+    labels={'produccion': 'Producción (ton)'},
+    zoom=5,
+    center={"lat": 4.5709, "lon": -74.2973}
+)
+fig_mapa.update_traces(textfont=dict(size=9, color='black'), textposition='top center')
+
+# Configurar estilo del mapa (minimalista para mejor visualización)
+fig_mapa.update_layout(
+    mapbox_style="carto-positron",  # Estilo limpio y minimalista
+    height=700,
+    margin={"r":0,"t":40,"l":0,"b":0}
 )
 
-# Configurar el mapa centrado en Colombia
-fig_mapa.update_geos(
-    resolution=50,
-    showcountries=True,
-    countrycolor="lightgray",
-    showcoastlines=True,
-    coastlinecolor="gray",
-    projection_type="mercator",
-    lonaxis_range=[-82, -66],
-    lataxis_range=[-5, 13],
-    showland=True,
-    landcolor="rgb(243, 243, 243)",
-    showocean=True,
-    oceancolor="rgb(204, 229, 255)"
-)
-
-fig_mapa.update_layout(height=700)
 st.plotly_chart(fig_mapa, use_container_width=True)
 
-# Tabla con Top 10 municipios
+# Tabla con Top 10 departamentos
 col_top1, col_top2 = st.columns(2)
 
 with col_top1:
-    st.markdown("### Top 10 Municipios por Producción")
-    top_municipios = produccion_municipios.head(10)[['municipio_completo', 'produccion', 'area_sembrada', 'rendimiento']].copy()
-    top_municipios['produccion'] = (top_municipios['produccion'] / 1000).round(2)
-    top_municipios['area_sembrada'] = top_municipios['area_sembrada'].round(2)
-    top_municipios['rendimiento'] = top_municipios['rendimiento'].round(2)
-    top_municipios.columns = ['Municipio', 'Producción (K ton)', 'Área (ha)', 'Rendimiento (t/ha)']
-    st.dataframe(top_municipios, hide_index=True, use_container_width=True)
+    st.markdown("### Top 10 Departamentos por Producción")
+    top_departamentos = produccion_departamentos_mapa.sort_values('produccion', ascending=False).head(10)[['departamento', 'produccion', 'area_sembrada', 'rendimiento']].copy()
+    top_departamentos['produccion'] = (top_departamentos['produccion'] / 1000).round(2)
+    top_departamentos['area_sembrada'] = (top_departamentos['area_sembrada'] / 1000).round(2)
+    top_departamentos['rendimiento'] = top_departamentos['rendimiento'].round(2)
+    top_departamentos.columns = ['Departamento', 'Producción (K ton)', 'Área (K ha)', 'Rendimiento (t/ha)']
+    st.dataframe(top_departamentos, hide_index=True, use_container_width=True)
 
 with col_top2:
-    st.markdown("### Estadísticas Municipales")
-    total_municipios = len(produccion_municipios)
-    prod_top10 = produccion_municipios.head(10)['produccion'].sum()
-    prod_total = produccion_municipios['produccion'].sum()
-    concentracion = (prod_top10 / prod_total * 100) if prod_total > 0 else 0
+    st.markdown("### Estadísticas por Departamento")
+    total_departamentos = len(produccion_departamentos)
+    prod_top10_dept = produccion_departamentos.nlargest(10, 'produccion')['produccion'].sum()
+    prod_total_dept = produccion_departamentos['produccion'].sum()
+    concentracion_dept = (prod_top10_dept / prod_total_dept * 100) if prod_total_dept > 0 else 0
     
     st.markdown(f"""
-    - **Total de municipios productores:** {total_municipios}
-    - **Municipio líder:** {produccion_municipios.iloc[0]['municipio_completo']}
-    - **Producción del líder:** {produccion_municipios.iloc[0]['produccion']/1000:.2f}K ton
-    - **Concentración Top 10:** {concentracion:.1f}% de la producción total
-    - **Mayor rendimiento municipal:** {produccion_municipios.loc[produccion_municipios['rendimiento'].idxmax(), 'municipio_completo']} ({produccion_municipios['rendimiento'].max():.2f} t/ha)
+    - **Total de departamentos productores:** {total_departamentos}
+    - **Departamento líder:** {produccion_departamentos.nlargest(1, 'produccion')['departamento'].iloc[0]}
+    - **Producción del líder:** {produccion_departamentos['produccion'].max()/1000:.2f}K ton
+    - **Concentración Top 10:** {concentracion_dept:.1f}% de la producción total
+    - **Mayor rendimiento departamental:** {produccion_departamentos.loc[produccion_departamentos['rendimiento'].idxmax(), 'departamento']} ({produccion_departamentos['rendimiento'].max():.2f} t/ha)
     
-    El mapa de calor muestra la concentración geográfica de la producción arrocera a nivel municipal.
+    El mapa de calor muestra la concentración geográfica de la producción arrocera por departamento.
     """)
 
 st.markdown("---")
@@ -523,7 +543,9 @@ if 'area_cosechada' in df_filtrado.columns and df_filtrado['area_cosechada'].not
             x=eficiencia_dept['area_cosechada'].head(15),
             name='Área Cosechada',
             orientation='h',
-            marker=dict(color='green')
+            marker=dict(color='green'),
+            text=[f"{val/1000:.1f}K" for val in eficiencia_dept['area_cosechada'].head(15)],
+            textposition='inside'
         ))
         
         fig_efic1.add_trace(go.Bar(
@@ -531,7 +553,9 @@ if 'area_cosechada' in df_filtrado.columns and df_filtrado['area_cosechada'].not
             x=eficiencia_dept['perdida'].head(15),
             name='Área No Cosechada (Pérdida)',
             orientation='h',
-            marker=dict(color='red')
+            marker=dict(color='red'),
+            text=[f"{val/1000:.1f}K" if val >= 1000 else f"{val:.0f}" for val in eficiencia_dept['perdida'].head(15)],
+            textposition='inside'
         ))
         
         fig_efic1.update_layout(
@@ -555,8 +579,10 @@ if 'area_cosechada' in df_filtrado.columns and df_filtrado['area_cosechada'].not
             labels={'eficiencia_%': 'Eficiencia (%)', 'departamento': 'Departamento'},
             color='eficiencia_%',
             color_continuous_scale='RdYlGn',
-            range_color=[80, 100]
+            range_color=[80, 100],
+            text='eficiencia_%'
         )
+        fig_efic2.update_traces(texttemplate='%{text:.1f}%', textposition='outside')
         fig_efic2.update_layout(height=600)
         st.plotly_chart(fig_efic2, use_container_width=True)
     
@@ -603,6 +629,7 @@ with col1:
         size='rendimiento',
         color='rendimiento',
         hover_name='departamento',
+        text='departamento',
         title='Área Sembrada vs Producción por Departamento',
         labels={
             'area_sembrada': 'Área Sembrada (ha)',
@@ -612,6 +639,7 @@ with col1:
         color_continuous_scale='Viridis',
         size_max=30
     )
+    fig_scatter.update_traces(textposition='top center', textfont=dict(size=8))
     fig_scatter.update_layout(height=500)
     st.plotly_chart(fig_scatter, use_container_width=True)
     
@@ -696,8 +724,10 @@ if 'sistema_productivo' in df_filtrado.columns and df_filtrado['sistema_producti
             title='Ranking de Sistemas Productivos por Producción',
             labels={'x': 'Producción (K ton)', 'y': 'Sistema Productivo'},
             color=sistemas.values,
-            color_continuous_scale='Blues'
+            color_continuous_scale='Blues',
+            text=[f"{val/1000:.1f}" for val in sistemas.values]
         )
+        fig3.update_traces(texttemplate='%{text}K', textposition='outside')
         fig3.update_layout(height=600, showlegend=False)
         st.plotly_chart(fig3, use_container_width=True)
     
@@ -711,8 +741,10 @@ if 'sistema_productivo' in df_filtrado.columns and df_filtrado['sistema_producti
             title='Ranking de Sistemas por Rendimiento Promedio',
             labels={'x': 'Sistema Productivo', 'y': 'Rendimiento (t/ha)'},
             color=rend_sistemas.values,
-            color_continuous_scale='RdYlGn'
+            color_continuous_scale='RdYlGn',
+            text=rend_sistemas.values
         )
+        fig4.update_traces(texttemplate='%{text:.2f}', textposition='outside')
         fig4.update_layout(height=600, showlegend=False, xaxis_tickangle=-45, xaxis={'categoryorder':'total descending'})
         st.plotly_chart(fig4, use_container_width=True)
     
@@ -792,7 +824,8 @@ with col1:
         nbins=30,
         title='Distribución de Rendimientos',
         labels={'rendimiento': 'Rendimiento (t/ha)', 'count': 'Frecuencia'},
-        color_discrete_sequence=['green']
+        color_discrete_sequence=['green'],
+        text_auto=True
     )
     fig_hist_rend.update_layout(
         height=400, 
@@ -811,7 +844,8 @@ with col2:
         nbins=40,
         title='Distribución de Producción por Municipio',
         labels={'x': 'Producción (ton)', 'count': 'Número de Municipios'},
-        color_discrete_sequence=['blue']
+        color_discrete_sequence=['blue'],
+        text_auto=True
     )
     fig_hist_prod.update_layout(
         height=400, 
@@ -845,6 +879,8 @@ if len(produccion_dep_rank) >= 10:
         'Categoría': ['Bottom 10']*10 + ['Top 10']*10
     })
     
+    comparison_data['Producción_label'] = comparison_data['Producción'].apply(lambda x: f"{abs(x)/1000:.1f}K" if abs(x) >= 1000 else f"{abs(x):.0f}")
+    
     fig_divergente = px.bar(
         comparison_data,
         y='Departamento',
@@ -853,8 +889,10 @@ if len(produccion_dep_rank) >= 10:
         orientation='h',
         title='Comparativa: Top 10 vs Bottom 10 Departamentos por Producción',
         labels={'Producción': 'Producción (ton)', 'Departamento': 'Departamento'},
-        color_discrete_map={'Top 10': 'green', 'Bottom 10': 'red'}
+        color_discrete_map={'Top 10': 'green', 'Bottom 10': 'red'},
+        text='Producción_label'
     )
+    fig_divergente.update_traces(textposition='outside')
     fig_divergente.update_layout(height=700, xaxis_title='← Bottom 10 | Producción (ton) | Top 10 →')
     st.plotly_chart(fig_divergente, use_container_width=True)
     
